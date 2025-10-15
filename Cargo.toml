@@ -16,6 +16,7 @@ wasm-bindgen-futures = "0.4.50"
 web-sys = "0.3.70"
 egui_plot = "0.34.0"
 can-dbc = "6.0.0"
+rfd = "0.15.4"
 
 [profile.release]
 opt-level = 2

@@ -1,4 +1,6 @@
+use can_plotter::SharedApp;
 use eframe::wasm_bindgen::JsCast as _;
+use std::{cell::RefCell, rc::Rc};
 
 fn main() {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
@@ -21,7 +23,11 @@ fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(|cc| Ok(Box::new(can_plotter::App::new(cc)))),
+                Box::new(|cc| {
+                    Ok(Box::new(SharedApp(Rc::new(RefCell::new(
+                        can_plotter::App::new(cc),
+                    )))))
+                }),
             )
             .await;
 

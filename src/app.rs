@@ -1,6 +1,6 @@
 use egui_plot::{Legend, Line, Plot, PlotPoints};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{cell::RefCell, ops::Deref, rc::Rc, sync::Arc};
 
 use crate::dbc::{Dbc, SerializableDbc};
 
@@ -10,8 +10,8 @@ pub struct AppSaveState {
 }
 
 pub struct App {
-    dbc: Option<Dbc>,
-    errors: Vec<String>,
+    pub dbc: Option<Dbc>,
+    pub errors: Vec<String>,
 }
 
 impl Default for App {
@@ -33,7 +33,7 @@ impl App {
         }
     }
 
-    fn handle_dbc(&mut self, name: String, bytes: Arc<[u8]>) {
+    pub fn handle_dbc(&mut self, name: String, bytes: Arc<[u8]>) {
         match Dbc::new(Arc::from(name), bytes) {
             Ok(dbc) => {
                 let _ = self.dbc.insert(dbc);
@@ -57,15 +57,8 @@ impl App {
             ..Default::default()
         }
     }
-}
 
-impl eframe::App for App {
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        log::info!("Saved data");
-        eframe::set_value(storage, eframe::APP_KEY, &self.get_save_state());
-    }
-
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn handle_file_inputs(&mut self, ctx: &egui::Context) {
         ctx.input(|input_state| {
             input_state
                 .raw
@@ -81,37 +74,49 @@ impl eframe::App for App {
                     self.handle_dbc(dbc_file.name.clone(), bytes);
                 });
         });
+    }
+}
 
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+pub struct SharedApp(pub Rc<RefCell<App>>);
+
+impl Deref for SharedApp {
+    type Target = Rc<RefCell<App>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl eframe::App for SharedApp {
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        log::info!("Saved data");
+        eframe::set_value(
+            storage,
+            eframe::APP_KEY,
+            &self.borrow_mut().get_save_state(),
+        );
+    }
+
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let mut app = self.borrow_mut();
+
+        app.handle_file_inputs(&ctx);
+
+        egui::TopBottomPanel::top("top_panel").show(&ctx, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 egui::widgets::global_theme_preference_buttons(ui);
             });
 
-            if !self.errors.is_empty() {
-                ui.label("cacaca");
-                self.errors.iter().for_each(|error| {
+            if !app.errors.is_empty() {
+                app.errors.iter().for_each(|error| {
                     ui.label(error);
+                    // TODO: Add a remove button for the warnings/errors
                 });
             }
         });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            let mut should_remove_dbc = false;
-            if let Some(dbc) = &self.dbc {
-                ui.horizontal(|ui| {
-                    ui.label(&*dbc.name);
-                    should_remove_dbc = ui.button("Quitar").clicked();
-                });
-            } else {
-                ui.horizontal(|ui| {
-                    ui.label("No dbc loaded");
-                    /*if ui.button("Seleccionar DBC").clicked() {}*/
-                });
-            }
-            if should_remove_dbc {
-                let _ = self.dbc.take();
-            }
+        app.draw_side_panel(&ctx, self.clone());
 
+        egui::CentralPanel::default().show(&ctx, |ui| {
             ui.heading("Gráfica");
             Plot::new("KAKUKU")
                 .legend(Legend::default())
