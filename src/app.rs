@@ -2,7 +2,10 @@ use egui_plot::{Legend, Line, Plot, PlotPoints};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, ops::Deref, rc::Rc, sync::Arc};
 
-use crate::dbc::{Dbc, SerializableDbc};
+use crate::{
+    dbc::{Dbc, SerializableDbc},
+    widgets::close_button_ui,
+};
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct AppSaveState {
@@ -105,14 +108,31 @@ impl eframe::App for SharedApp {
             egui::MenuBar::new().ui(ui, |ui| {
                 egui::widgets::global_theme_preference_buttons(ui);
             });
-
-            if !app.errors.is_empty() {
-                app.errors.iter().for_each(|error| {
-                    ui.label(error);
-                    // TODO: Add a remove button for the warnings/errors
-                });
-            }
         });
+
+        // Errors
+        if !app.errors.is_empty() {
+            let mut errors_to_close = Vec::new();
+            egui::Window::new("The following errors ocurred").show(ctx, |ui| {
+                app.errors
+                    .iter()
+                    .enumerate()
+                    .for_each(|(error_idx, error)| {
+                        ui.horizontal(|ui| {
+                            ui.label(error);
+                            if close_button_ui(ui, ui.max_rect()).clicked() {
+                                errors_to_close.push(error_idx);
+                            }
+                        });
+                        ui.separator();
+                    });
+            });
+
+            errors_to_close.sort_unstable_by(|idx_a, idx_b| idx_b.cmp(idx_a));
+            errors_to_close.iter().for_each(|error_idx| {
+                app.errors.swap_remove(*error_idx);
+            });
+        }
 
         app.draw_side_panel(&ctx, self.clone());
 
