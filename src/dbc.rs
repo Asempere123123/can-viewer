@@ -1,9 +1,17 @@
-use can_dbc::DBC;
+use can_dbc::{DBC, Message};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
+
+fn generate_map_from_dbc(dbc: &DBC) -> HashMap<u32, Message> {
+    dbc.messages()
+        .iter()
+        .map(|message| (message.message_id().raw(), message.clone()))
+        .collect()
+}
 
 pub struct Dbc {
     pub name: Arc<str>,
+    messages_map: HashMap<u32, Message>,
     raw_dbc: Arc<[u8]>,
     pub inner: DBC,
 }
@@ -13,6 +21,7 @@ impl Dbc {
         match DBC::from_slice(&raw_dbc) {
             Ok(dbc) => Ok(Self {
                 name: name,
+                messages_map: generate_map_from_dbc(&dbc),
                 raw_dbc: raw_dbc,
                 inner: dbc,
             }),
@@ -21,6 +30,7 @@ impl Dbc {
                     log::warn!("INCOMPLETE DBC");
                     Ok(Self {
                         name: name,
+                        messages_map: generate_map_from_dbc(&dbc),
                         raw_dbc: raw_dbc,
                         inner: dbc,
                     })
