@@ -10,7 +10,13 @@ impl App {
         egui::SidePanel::left("dbc_panel")
             .resizable(true)
             .show(ctx, |ui| {
-                // File selector
+                // Loaded Message file selector
+                ui.heading("Messages:");
+                ui.label(format!("{}", self.messages.len()));
+                ui.separator();
+
+                // Dbc File selector
+                ui.heading("DBC:");
                 let mut should_remove_dbc = false;
                 if let Some(dbc) = &self.dbc {
                     ui.horizontal(|ui| {
@@ -41,7 +47,7 @@ impl App {
                     let _ = self.dbc.take();
                 }
 
-                // Message viewer
+                // DBC Message viewer
                 let Some(dbc) = &self.dbc else {
                     ui.heading("No DBC file loaded");
                     return;

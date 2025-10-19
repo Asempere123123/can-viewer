@@ -1,5 +1,6 @@
 mod app;
 mod dbc;
+mod messages;
 mod side_panel;
 mod widgets;
 
