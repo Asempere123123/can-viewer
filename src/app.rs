@@ -1,22 +1,25 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE, write::EncoderStringWriter};
 use eframe::Storage;
-use egui_plot::{Legend, Line, Plot, PlotPoints};
+use egui::Layout;
 use std::{cell::RefCell, ops::Deref, rc::Rc, sync::Arc};
 
 use crate::{
     dbc::{Dbc, SerializableDbc},
     messages::Messages,
+    plots::Plots,
     widgets::close_button_ui,
 };
 
 #[derive(Default)]
 pub struct AppSaveState {
     dbc: Option<SerializableDbc>,
+    plots: Plots,
     messages: Messages,
 }
 
 impl AppSaveState {
     const DBC: &str = "DBC";
+    const PLOTS: &str = "PLOTS";
     const MESSAGES: &str = "MESSAGES";
 
     fn save(self, storage: &mut dyn Storage) {
@@ -35,6 +38,16 @@ impl AppSaveState {
         .unwrap();
         // TODO: quitar este unwrap, es solo para que me avise al hacer pruebas
         storage.set_string(AppSaveState::MESSAGES, writer.into_inner());
+
+        let mut writer = EncoderStringWriter::new(&URL_SAFE);
+        bincode::serde::encode_into_std_write(
+            &self.plots,
+            &mut writer,
+            bincode::config::standard(),
+        )
+        .unwrap();
+        // TODO: quitar este unwrap, es solo para que me avise al hacer pruebas
+        storage.set_string(AppSaveState::PLOTS, writer.into_inner());
     }
 
     fn load(storage: &dyn Storage) -> AppSaveState {
@@ -58,13 +71,29 @@ impl AppSaveState {
             .map(|val| val.0)
             .unwrap_or_default();
 
-        AppSaveState { dbc, messages }
+        let Some(b64_raw) = storage.get_string(AppSaveState::PLOTS) else {
+            return Default::default();
+        };
+        let Ok(raw) = URL_SAFE.decode(&b64_raw) else {
+            return Default::default();
+        };
+        let plots = bincode::serde::decode_from_slice(&raw, bincode::config::standard())
+            .map(|val| val.0)
+            .unwrap_or_default();
+
+        AppSaveState {
+            dbc,
+            plots,
+            messages,
+        }
     }
 }
 
 pub struct App {
     pub dbc: Option<Dbc>,
     pub messages: Messages,
+    pub plots: Plots,
+
     pub errors: Vec<String>,
 }
 
@@ -73,6 +102,7 @@ impl Default for App {
         Self {
             dbc: None,
             messages: Messages::empty(),
+            plots: Plots::default(),
             errors: Vec::new(),
         }
     }
@@ -100,6 +130,7 @@ impl App {
     fn get_save_state(&self) -> AppSaveState {
         AppSaveState {
             dbc: self.dbc.as_ref().map(|dbc| dbc.into_serializable()),
+            plots: self.plots.clone(),
             messages: self.messages.clone(),
         }
     }
@@ -110,6 +141,7 @@ impl App {
                 .dbc
                 .map(|saved_dbc| Dbc::from_serializable(saved_dbc))
                 .and_then(|dbc| dbc.ok()),
+            plots: save_state.plots,
             messages: save_state.messages,
             ..Default::default()
         }
@@ -160,6 +192,12 @@ impl eframe::App for SharedApp {
             egui::MenuBar::new().ui(ui, |ui| {
                 egui::widgets::global_theme_preference_buttons(ui);
             });
+
+            ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.button("Add Plot").clicked() {
+                    app.plots.add_one();
+                }
+            });
         });
 
         // Errors
@@ -189,15 +227,7 @@ impl eframe::App for SharedApp {
         app.draw_side_panel(&ctx, self.clone());
 
         egui::CentralPanel::default().show(&ctx, |ui| {
-            ui.heading("Gráfica");
-            Plot::new("KAKUKU")
-                .legend(Legend::default())
-                .show(ui, |plot_ui| {
-                    plot_ui.line(Line::new(
-                        "tusmuertos",
-                        PlotPoints::new(vec![[0., 0.], [100., 100.]]),
-                    ));
-                });
+            Plots::draw(&mut app, ui);
         });
     }
 }

@@ -1,8 +1,9 @@
+use egui::Id;
 use rfd::AsyncFileDialog;
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 use wasm_bindgen_futures::spawn_local;
 
-use crate::App;
+use crate::{App, dbc::Signal};
 
 impl App {
     pub fn draw_side_panel(&mut self, ctx: &egui::Context, app_handle: Rc<RefCell<App>>) {
@@ -58,9 +59,20 @@ impl App {
                     for message in dbc.inner.messages() {
                         egui::collapsing_header::CollapsingHeader::new(message.message_name())
                             .show(ui, |ui| {
-                                message.signals().iter().for_each(|signal| {
-                                    ui.label(signal.name());
-                                });
+                                message.signals().iter().enumerate().for_each(
+                                    |(signal_idx, signal)| {
+                                        ui.dnd_drag_source(
+                                            Id::new(message.message_id().raw()).with(signal_idx),
+                                            Signal {
+                                                message_id: message.message_id().raw(),
+                                                signal_idx,
+                                            },
+                                            |ui| {
+                                                ui.label(signal.name());
+                                            },
+                                        );
+                                    },
+                                );
                             });
                     }
                 });

@@ -11,7 +11,7 @@ fn generate_map_from_dbc(dbc: &DBC) -> HashMap<u32, Message> {
 
 pub struct Dbc {
     pub name: Arc<str>,
-    messages_map: HashMap<u32, Message>,
+    pub messages_map: HashMap<u32, Message>,
     raw_dbc: Arc<[u8]>,
     pub inner: DBC,
 }
@@ -56,4 +56,10 @@ impl Dbc {
 pub struct SerializableDbc {
     name: Arc<str>,
     raw_dbc: Arc<[u8]>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct Signal {
+    pub message_id: u32,
+    pub signal_idx: usize,
 }
