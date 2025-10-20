@@ -1,6 +1,6 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE, write::EncoderStringWriter};
+use eframe::Storage;
 use egui_plot::{Legend, Line, Plot, PlotPoints};
-use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, ops::Deref, rc::Rc, sync::Arc};
 
 use crate::{
@@ -9,10 +9,57 @@ use crate::{
     widgets::close_button_ui,
 };
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Default)]
 pub struct AppSaveState {
     dbc: Option<SerializableDbc>,
     messages: Messages,
+}
+
+impl AppSaveState {
+    const DBC: &str = "DBC";
+    const MESSAGES: &str = "MESSAGES";
+
+    fn save(self, storage: &mut dyn Storage) {
+        let mut writer = EncoderStringWriter::new(&URL_SAFE);
+        bincode::serde::encode_into_std_write(&self.dbc, &mut writer, bincode::config::standard())
+            .unwrap();
+        // TODO: quitar este unwrap, es solo para que me avise al hacer pruebas
+        storage.set_string(AppSaveState::DBC, writer.into_inner());
+
+        let mut writer = EncoderStringWriter::new(&URL_SAFE);
+        bincode::serde::encode_into_std_write(
+            &self.messages,
+            &mut writer,
+            bincode::config::standard(),
+        )
+        .unwrap();
+        // TODO: quitar este unwrap, es solo para que me avise al hacer pruebas
+        storage.set_string(AppSaveState::MESSAGES, writer.into_inner());
+    }
+
+    fn load(storage: &dyn Storage) -> AppSaveState {
+        let Some(b64_raw) = storage.get_string(AppSaveState::DBC) else {
+            return Default::default();
+        };
+        let Ok(raw) = URL_SAFE.decode(&b64_raw) else {
+            return Default::default();
+        };
+        let dbc = bincode::serde::decode_from_slice(&raw, bincode::config::standard())
+            .map(|val| val.0)
+            .unwrap_or_default();
+
+        let Some(b64_raw) = storage.get_string(AppSaveState::MESSAGES) else {
+            return Default::default();
+        };
+        let Ok(raw) = URL_SAFE.decode(&b64_raw) else {
+            return Default::default();
+        };
+        let messages = bincode::serde::decode_from_slice(&raw, bincode::config::standard())
+            .map(|val| val.0)
+            .unwrap_or_default();
+
+        AppSaveState { dbc, messages }
+    }
 }
 
 pub struct App {
@@ -35,18 +82,7 @@ impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         if let Some(storage) = cc.storage {
             log::info!("Got saved data");
-            let Some(b64_raw) = storage.get_string(eframe::APP_KEY) else {
-                return Default::default();
-            };
-            let Ok(raw) = URL_SAFE.decode(&b64_raw) else {
-                return Default::default();
-            };
-
-            Self::from_save_state(
-                bincode::serde::decode_from_slice(&raw, bincode::config::standard())
-                    .map(|val| val.0)
-                    .unwrap_or_default(),
-            )
+            App::from_save_state(AppSaveState::load(storage))
         } else {
             Default::default()
         }
@@ -112,16 +148,7 @@ impl Deref for SharedApp {
 impl eframe::App for SharedApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         log::info!("Saved data");
-        let mut writer = EncoderStringWriter::new(&URL_SAFE);
-        bincode::serde::encode_into_std_write(
-            &self.borrow().get_save_state(),
-            &mut writer,
-            bincode::config::standard(),
-        )
-        .unwrap();
-        // TODO: quitar este unwrap, es solo para que me avise al hacer prueabs
-
-        storage.set_string(eframe::APP_KEY, writer.into_inner());
+        self.borrow().get_save_state().save(storage);
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
