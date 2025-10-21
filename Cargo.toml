@@ -22,6 +22,7 @@ regex = "1.12.2"
 regex-macro = "0.3.0"
 bincode = { version = "2.0.1", features = ["serde"] }
 base64 = "0.22.1"
+hex = "0.4.3"
 
 [profile.release]
 opt-level = 2

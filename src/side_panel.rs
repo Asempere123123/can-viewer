@@ -12,7 +12,12 @@ impl App {
             .resizable(true)
             .show(ctx, |ui| {
                 // Loaded Message file selector
-                ui.heading("Messages:");
+                ui.horizontal(|ui| {
+                    ui.heading("Messages:");
+                    if ui.button("Clear").clicked() {
+                        self.messages.0.clear();
+                    }
+                });
                 ui.label(format!("{}", self.messages.len()));
                 ui.separator();
 
@@ -22,7 +27,7 @@ impl App {
                 if let Some(dbc) = &self.dbc {
                     ui.horizontal(|ui| {
                         ui.label(&*dbc.name);
-                        should_remove_dbc = ui.button("Quitar").clicked();
+                        should_remove_dbc = ui.button("Remove").clicked();
                     });
                 } else {
                     ui.horizontal(|ui| {

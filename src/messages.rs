@@ -1,51 +1,54 @@
 use chrono::{DateTime, Utc};
 use regex_macro::regex;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 #[derive(Serialize, Deserialize, Clone, Default)]
-pub struct Messages(Vec<Message>);
+pub struct Messages(pub HashMap<u32, Vec<Message>>);
 
 impl Messages {
     pub fn from_string(string: Cow<'_, str>) -> Messages {
-        Messages(
-            string
-                .lines()
-                .filter_map(|message_str| Message::from_str(message_str))
-                .collect(),
-        )
+        let mut messages: HashMap<u32, Vec<Message>> = HashMap::new();
+        for (msg_id, message) in string
+            .lines()
+            .filter_map(|message_str| Message::from_str(message_str))
+        {
+            messages.entry(msg_id).or_default().push(message);
+        }
+
+        Messages(messages)
     }
 
     pub fn empty() -> Messages {
-        Messages(Vec::new())
+        Messages(HashMap::new())
     }
 
     pub fn extend(&mut self, other: &Messages) {
-        self.0.extend_from_slice(&other.0);
+        self.0.extend(other.0.clone().into_iter());
     }
 
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.0.iter().map(|(_k, messages)| messages.len()).sum()
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct Message {
-    id: u32,
-    contents: u64,
-    timestamp: DateTime<Utc>,
+pub struct Message {
+    pub contents: [u8; 8],
+    pub timestamp: DateTime<Utc>,
 }
 
 impl Message {
-    fn from_str(str: &str) -> Option<Message> {
+    fn from_str(str: &str) -> Option<(u32, Message)> {
         if let Some(captures) =
             regex!(r"\(([\d.]+)\)\s+\w+\s+([0-9A-Fa-f]+)#([0-9A-Fa-f]+)").captures(str)
         {
-            let Ok(id) = u32::from_str_radix(&captures[2], 10) else {
+            let Ok(id) = u32::from_str_radix(&captures[2], 16) else {
                 return None;
             };
 
-            let Ok(contents) = u64::from_str_radix(&captures[3], 16) else {
+            use hex::FromHex;
+            let Ok(contents) = <[u8; 8]>::from_hex(&captures[3]) else {
                 return None;
             };
 
@@ -70,11 +73,13 @@ impl Message {
                 return None;
             };
 
-            Some(Message {
+            Some((
                 id,
-                contents,
-                timestamp,
-            })
+                Message {
+                    contents,
+                    timestamp,
+                },
+            ))
         } else {
             None
         }
