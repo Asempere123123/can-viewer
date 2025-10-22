@@ -53,7 +53,7 @@ impl Plots {
 
             plots_to_close.sort_by(|a, b| b.cmp(a));
             for plot_to_close in plots_to_close {
-                app.plots.0.swap_remove(plot_to_close);
+                app.plots.0.remove(plot_to_close);
             }
         });
     }
@@ -114,7 +114,7 @@ impl Plot {
 
             signals_to_erase.sort_by(|a, b| b.cmp(a));
             for signal_to_erase in signals_to_erase {
-                self.signals.swap_remove(signal_to_erase);
+                self.signals.remove(signal_to_erase);
             }
         });
     }

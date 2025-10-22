@@ -50,13 +50,13 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Build | Trunk
-        #working-directory: ./game
+        working-directory: ./frontend
         run: trunk build --release
 
       - name: Build | mv
         run: |
-        #  rm -rf ./dist
-        #  cp -r ./game/dist ./dist
+          rm -rf ./dist
+          cp -r ./frontend/dist ./dist
 
       - name: Build | Upload
         uses: actions/upload-pages-artifact@v3
