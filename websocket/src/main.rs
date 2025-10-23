@@ -36,8 +36,18 @@ async fn handle_conn(stream: TcpStream, mut msg_recv: Receiver<Arc<str>>) {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> std::io::Result<()> {
-    let can_socket = CanSocket::open("vcan0")?;
-    let tcp_listener = TcpListener::bind("localhost:3333").await?;
+    let _ = dotenvy::dotenv().map_err(|e| {
+        if !e.not_found() {
+            println!("Failed to read dotenv file {:?}", e);
+        }
+        e
+    });
+
+    let can_socket =
+        CanSocket::open(&std::env::var("CAN_SOCKET").expect("CAN_SOCKET env var must be set"))?;
+    let tcp_listener =
+        TcpListener::bind(std::env::var("HOST_ADDR").expect("HOST_ADDR env var must be set"))
+            .await?;
 
     let start_time = SystemTime::now();
     let time = Instant::now();
