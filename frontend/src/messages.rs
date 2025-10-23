@@ -24,7 +24,20 @@ impl Messages {
     }
 
     pub fn extend(&mut self, other: &Messages) {
-        self.0.extend(other.0.clone().into_iter());
+        self.0
+            .extend(other.0.iter().map(|(id, msgs)| (*id, msgs.clone())));
+    }
+
+    pub fn push(&mut self, id: u32, msg: Message) {
+        let messages = self.0.entry(id).or_default();
+        let idx = match messages.binary_search_by(|msg_to_comp_against| {
+            msg_to_comp_against.timestamp.cmp(&msg.timestamp)
+        }) {
+            Ok(idx) => idx,
+            Err(idx) => idx,
+        };
+
+        messages.insert(idx, msg);
     }
 
     pub fn len(&self) -> usize {
@@ -39,7 +52,7 @@ pub struct Message {
 }
 
 impl Message {
-    fn from_str(str: &str) -> Option<(u32, Message)> {
+    pub fn from_str(str: &str) -> Option<(u32, Message)> {
         if let Some(captures) =
             regex!(r"\(([\d.]+)\)\s+\w+\s+([0-9A-Fa-f]+)#([0-9A-Fa-f]+)").captures(str)
         {

@@ -15,12 +15,14 @@ pub struct AppSaveState {
     dbc: Option<SerializableDbc>,
     plots: Plots,
     messages: Messages,
+    ws_host: String,
 }
 
 impl AppSaveState {
     const DBC: &str = "DBC";
     const PLOTS: &str = "PLOTS";
     const MESSAGES: &str = "MESSAGES";
+    const WS: &str = "WS";
 
     fn save(self, storage: &mut dyn Storage) {
         let mut writer = EncoderStringWriter::new(&URL_SAFE);
@@ -48,6 +50,16 @@ impl AppSaveState {
         .unwrap();
         // TODO: quitar este unwrap, es solo para que me avise al hacer pruebas
         storage.set_string(AppSaveState::PLOTS, writer.into_inner());
+
+        let mut writer = EncoderStringWriter::new(&URL_SAFE);
+        bincode::serde::encode_into_std_write(
+            &self.ws_host,
+            &mut writer,
+            bincode::config::standard(),
+        )
+        .unwrap();
+        // TODO: quitar este unwrap, es solo para que me avise al hacer pruebas
+        storage.set_string(AppSaveState::WS, writer.into_inner());
     }
 
     fn load(storage: &dyn Storage) -> AppSaveState {
@@ -81,10 +93,21 @@ impl AppSaveState {
             .map(|val| val.0)
             .unwrap_or_default();
 
+        let Some(b64_raw) = storage.get_string(AppSaveState::WS) else {
+            return Default::default();
+        };
+        let Ok(raw) = URL_SAFE.decode(&b64_raw) else {
+            return Default::default();
+        };
+        let ws_host = bincode::serde::decode_from_slice(&raw, bincode::config::standard())
+            .map(|val| val.0)
+            .unwrap_or_default();
+
         AppSaveState {
             dbc,
             plots,
             messages,
+            ws_host,
         }
     }
 }
@@ -93,7 +116,9 @@ pub struct App {
     pub dbc: Option<Dbc>,
     pub messages: Messages,
     pub plots: Plots,
+    pub ws_addr: String,
 
+    pub ws_connected: bool,
     pub errors: Vec<String>,
 }
 
@@ -103,6 +128,8 @@ impl Default for App {
             dbc: None,
             messages: Messages::empty(),
             plots: Plots::default(),
+            ws_addr: String::from("ws://localhost:3333"),
+            ws_connected: false,
             errors: Vec::new(),
         }
     }
@@ -132,6 +159,7 @@ impl App {
             dbc: self.dbc.as_ref().map(|dbc| dbc.into_serializable()),
             plots: self.plots.clone(),
             messages: self.messages.clone(),
+            ws_host: self.ws_addr.clone(),
         }
     }
 
@@ -143,6 +171,7 @@ impl App {
                 .and_then(|dbc| dbc.ok()),
             plots: save_state.plots,
             messages: save_state.messages,
+            ws_addr: save_state.ws_host,
             ..Default::default()
         }
     }

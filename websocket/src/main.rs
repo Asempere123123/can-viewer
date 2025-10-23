@@ -52,7 +52,7 @@ async fn main() -> std::io::Result<()> {
     let start_time = SystemTime::now();
     let time = Instant::now();
 
-    let (message_sender, message_recv) = channel::<Arc<str>>(32);
+    let (message_sender, message_recv) = channel(128);
 
     // Accept task
     tokio::spawn(async move {
@@ -78,7 +78,7 @@ async fn main() -> std::io::Result<()> {
         let timestamp = unsafe { timestamp.duration_since(UNIX_EPOCH).unwrap_unchecked() };
 
         let _ = message_sender.send(Arc::from(format!(
-            "({}.{}) can0 {}#{:X}",
+            "({}.{}) can0 {:X}#{:X}",
             timestamp.as_secs(),
             timestamp.subsec_nanos(),
             id,

@@ -29,4 +29,4 @@ sudo ip link set up vcan0
 
 # start playback
 echo "Playing back CAN log '$LOGFILE' on vcan0..."
-cat ~/Downloads/20250817_015645.log | canplayer vcan0=can0
+cat "$LOGFILE" | canplayer vcan0=can0

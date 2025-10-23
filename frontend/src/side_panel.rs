@@ -1,4 +1,7 @@
-use egui::Id;
+use egui::{Id, TextEdit};
+use futures::StreamExt;
+use gloo_net::websocket::Message;
+use num_format::{Locale, ToFormattedString};
 use rfd::AsyncFileDialog;
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 use wasm_bindgen_futures::spawn_local;
@@ -38,7 +41,62 @@ impl App {
                         });
                     }
                 });
-                ui.label(format!("{}", self.messages.len()));
+                ui.horizontal(|ui| {
+                    if self.ws_connected {
+                        ui.label(format!("Connected to ws on: {}", self.ws_addr));
+                        return;
+                    }
+
+                    ui.label("Websocket: ");
+                    ui.add(TextEdit::singleline(&mut self.ws_addr));
+                    let app_handle = app_handle.clone();
+                    let ctx = ctx.clone();
+                    if ui.button("Connect WS").clicked() {
+                        spawn_local(async move {
+                            let Ok(mut ws) = gloo_net::websocket::futures::WebSocket::open(
+                                &app_handle.borrow().ws_addr,
+                            ) else {
+                                app_handle
+                                    .borrow_mut()
+                                    .errors
+                                    .push("Could not connect to ws".to_string());
+                                return;
+                            };
+
+                            app_handle.borrow_mut().ws_connected = true;
+
+                            while let Some(msg) = ws.next().await {
+                                let Ok(msg) = msg else {
+                                    continue;
+                                };
+
+                                let Message::Text(msg) = msg else {
+                                    continue;
+                                };
+
+                                let Some((id, msg)) = crate::messages::Message::from_str(&msg)
+                                else {
+                                    continue;
+                                };
+
+                                app_handle.borrow_mut().messages.push(id, msg);
+                                ctx.request_repaint();
+                            }
+
+                            app_handle
+                                .borrow_mut()
+                                .errors
+                                .push("WS disconnected".to_string());
+                            app_handle.borrow_mut().ws_connected = false;
+                            // Creo que no es necesario pero por si acaso
+                            ctx.request_repaint();
+                        });
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Ammount: ");
+                    ui.label(self.messages.len().to_formatted_string(&Locale::en));
+                });
                 ui.separator();
 
                 // Dbc File selector
