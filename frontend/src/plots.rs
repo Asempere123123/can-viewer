@@ -127,6 +127,37 @@ impl Plot {
         max_rect: Rect,
         messages: &Messages,
     ) {
+        // TODO: this is local to each plot. So if 2 plots are created, their start instant will not match
+        // This might not be the expected behaviour by anyone
+        let Some(first_signal_id) = self.signals.first().map(|signal| signal.message_id) else {
+            // Still have to draw an empty one
+            egui_plot::Plot::new(plot_idx)
+                .height(max_rect.height() * 0.9)
+                .width(max_rect.width() * 0.8)
+                .legend(Legend::default())
+                .show(ui, |_| {});
+            return;
+        };
+        let Some(initial_timestamp) = messages
+            .0
+            .get(&first_signal_id)
+            .map(|messages| {
+                // TODO: Code will be incorrect starting on year 2262 since it will overflow
+                messages.iter().next().map(|first_msg| unsafe {
+                    first_msg.timestamp.timestamp_nanos_opt().unwrap_unchecked()
+                })
+            })
+            .flatten()
+        else {
+            // Still have to draw an empty one
+            egui_plot::Plot::new(plot_idx)
+                .height(max_rect.height() * 0.9)
+                .width(max_rect.width() * 0.8)
+                .legend(Legend::default())
+                .show(ui, |_| {});
+            return;
+        };
+
         // Cuidado con usar usizes para ids en otro lado que entonces hay colisiones
         egui_plot::Plot::new(plot_idx)
             .height(max_rect.height() * 0.9)
@@ -143,20 +174,6 @@ impl Plot {
                         )
                     })
                     .filter_map(|(message_id, signal)| {
-                        let Some(initial_timestamp) = messages
-                            .0
-                            .get(&message_id)
-                            .map(|messages| {
-                                messages
-                                    .iter()
-                                    .next()
-                                    .map(|first_msg| first_msg.timestamp.timestamp_micros())
-                            })
-                            .flatten()
-                        else {
-                            return None;
-                        };
-
                         messages.0.get(&message_id).map(move |messages| {
                             (
                                 signal.name(),
@@ -164,9 +181,15 @@ impl Plot {
                                     let y = decode_signal(signal, &recv_message.contents);
 
                                     [
-                                        (recv_message.timestamp.timestamp_micros()
-                                            - initial_timestamp)
-                                            as f64,
+                                        // TODO: Same as before, change on year 2262
+                                        (unsafe {
+                                            recv_message
+                                                .timestamp
+                                                .timestamp_nanos_opt()
+                                                .unwrap_unchecked()
+                                        } - initial_timestamp)
+                                            as f64
+                                            / 10.0e9,
                                         y,
                                     ]
                                 }),
