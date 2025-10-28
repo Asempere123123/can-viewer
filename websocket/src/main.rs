@@ -78,7 +78,7 @@ async fn main() -> std::io::Result<()> {
         let timestamp = unsafe { timestamp.duration_since(UNIX_EPOCH).unwrap_unchecked() };
 
         let _ = message_sender.send(Arc::from(format!(
-            "({}.{}) can0 {:X}#{:X}",
+            "({}.{:09}) can0 {:X}#{:X}",
             timestamp.as_secs(),
             timestamp.subsec_nanos(),
             id,
