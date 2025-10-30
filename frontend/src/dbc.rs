@@ -2,16 +2,18 @@ use can_dbc::{DBC, Message};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 
-fn generate_map_from_dbc(dbc: &DBC) -> HashMap<u32, Message> {
+use crate::messages::RawCanMessageId;
+
+fn generate_map_from_dbc(dbc: &DBC) -> HashMap<RawCanMessageId, Message> {
     dbc.messages()
         .iter()
-        .map(|message| (message.message_id().raw(), message.clone()))
+        .map(|message| ((*message.message_id()).into(), message.clone()))
         .collect()
 }
 
 pub struct Dbc {
     pub name: Arc<str>,
-    pub messages_map: HashMap<u32, Message>,
+    pub messages_map: HashMap<RawCanMessageId, Message>,
     raw_dbc: Arc<[u8]>,
     pub inner: DBC,
 }
@@ -60,6 +62,6 @@ pub struct SerializableDbc {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Signal {
-    pub message_id: u32,
+    pub message_id: RawCanMessageId,
     pub signal_idx: usize,
 }

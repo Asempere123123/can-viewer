@@ -148,7 +148,7 @@ impl App {
                                         ui.dnd_drag_source(
                                             Id::new(message.message_id().raw()).with(signal_idx),
                                             Signal {
-                                                message_id: message.message_id().raw(),
+                                                message_id: (*message.message_id()).into(),
                                                 signal_idx,
                                             },
                                             |ui| {

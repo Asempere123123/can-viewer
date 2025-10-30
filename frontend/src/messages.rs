@@ -1,14 +1,15 @@
+use can_dbc::MessageId;
 use chrono::{DateTime, Utc};
 use regex_macro::regex;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, collections::HashMap};
 
 #[derive(Serialize, Deserialize, Clone, Default)]
-pub struct Messages(pub HashMap<u32, Vec<Message>>);
+pub struct Messages(pub HashMap<RawCanMessageId, Vec<Message>>);
 
 impl Messages {
     pub fn from_string(string: Cow<'_, str>) -> Messages {
-        let mut messages: HashMap<u32, Vec<Message>> = HashMap::new();
+        let mut messages: HashMap<RawCanMessageId, Vec<Message>> = HashMap::new();
         for (msg_id, message) in string
             .lines()
             .filter_map(|message_str| Message::from_str(message_str))
@@ -28,7 +29,7 @@ impl Messages {
             .extend(other.0.iter().map(|(id, msgs)| (*id, msgs.clone())));
     }
 
-    pub fn push(&mut self, id: u32, msg: Message) {
+    pub fn push(&mut self, id: RawCanMessageId, msg: Message) {
         let messages = self.0.entry(id).or_default();
         let idx = match messages.binary_search_by(|msg_to_comp_against| {
             msg_to_comp_against.timestamp.cmp(&msg.timestamp)
@@ -52,7 +53,7 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn from_str(str: &str) -> Option<(u32, Message)> {
+    pub fn from_str(str: &str) -> Option<(RawCanMessageId, Message)> {
         if let Some(captures) =
             regex!(r"\(([\d.]+)\)\s+\w+\s+([0-9A-Fa-f]+)#([0-9A-Fa-f]+)").captures(str)
         {
@@ -87,7 +88,7 @@ impl Message {
             };
 
             Some((
-                id,
+                RawCanMessageId(id),
                 Message {
                     contents,
                     timestamp,
@@ -95,6 +96,20 @@ impl Message {
             ))
         } else {
             None
+        }
+    }
+}
+
+// The MessageId::raw() method adds the extended tag bit, which is inconvenient for this use case
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Serialize, Deserialize, Debug)]
+#[repr(transparent)]
+pub struct RawCanMessageId(pub u32);
+
+impl From<MessageId> for RawCanMessageId {
+    fn from(value: MessageId) -> Self {
+        match value {
+            MessageId::Standard(id) => Self(id as u32),
+            MessageId::Extended(id) => Self(id),
         }
     }
 }
